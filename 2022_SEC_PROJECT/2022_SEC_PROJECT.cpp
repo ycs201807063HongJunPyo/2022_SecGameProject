@@ -157,7 +157,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         gameMenuRect.top = menuClientRect.top+50;
         gameMenuRect.right = menuClientRect.right - 100;
         gameMenuRect.bottom = menuClientRect.bottom;
-        SetTimer(hWnd, TIMER_ID_1, 1000, NULL);
+        SetTimer(hWnd, TIMER_ID_1, 0, NULL);
         //버튼 3종
         gameStartBtn = CreateWindow(L"button", L"게 임  시 작", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
             (menuClientRect.left + 50), 150, 150, 100, hWnd, (HMENU)IDC_BTN_START, NULL, NULL);
@@ -201,10 +201,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
         case VK_SPACE:
             check = gameTileRect->CheckTile(mouseX, mouseY, makeRectLeft, makeRectTop, (makeRectLeft + 40), (makeRectTop + 40));
+            //정답
             if (check == 1) {
                 score++;
-                KillTimer(hWnd, TIMER_ID_1);                    // 1번을 정지
-                SetTimer(hWnd, TIMER_ID_1, 1000, NULL);
+                KillTimer(hWnd, TIMER_ID_1);
+                SetTimer(hWnd, TIMER_ID_1, 3000, NULL);
+                InvalidateRect(hWnd, NULL, TRUE);
+
+                check = 0;
+            }
+            //틀림
+            else if (check == 2) {
+                KillTimer(hWnd, TIMER_ID_1);
+                SetTimer(hWnd, TIMER_ID_1, 3000, NULL);
                 InvalidateRect(hWnd, NULL, TRUE);
 
                 check = 0;
@@ -218,7 +227,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         if (TIMER_ID_1 == wParam) {
             //
             KillTimer(hWnd, TIMER_ID_1);                    // 1번을 정지
-            SetTimer(hWnd, TIMER_ID_1, 1000, NULL);
+            SetTimer(hWnd, TIMER_ID_1, 3000, NULL);
             InvalidateRect(hWnd, NULL, TRUE);
         }
         break;
@@ -234,8 +243,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     makeRectLeft = gameMenuRect.right - 45;
                 }
                 makeRectTop = (rand() % gameMenuRect.bottom);
-                if (makeRectTop >= (gameMenuRect.bottom - 40)) {
-                    makeRectLeft = gameMenuRect.bottom - 45;
+                if ((makeRectTop+40) >= (gameMenuRect.bottom - 10)) {
+                    makeRectTop = gameMenuRect.bottom - 45;
                 }
                 if (makeRectTop < gameMenuRect.top) {
                     makeRectTop = gameMenuRect.top + 2;
