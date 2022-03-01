@@ -26,6 +26,13 @@ RECT menuClientRect, gameMenuRect;  // 사용가능 영역 크기
 //게임시작용
 ///0 : 메인화면 / 1 : 노래 고르는 화면 / 2 : 게임 시작
 int gameStart = 0;
+//
+int makeRectLeft, makeRectTop;  //제작용 타일 좌표
+int mouseX, mouseY;  //마우스 위치
+int score = 0; //점수
+int check = 0;  //성공했나?
+//
+BOOL comboCheck = FALSE;  //콤보 체크용
 
 // 이 코드 모듈에 포함된 함수의 선언을 전달합니다:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -138,10 +145,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //
 //
 RectControl* gameTileRect = new RectControl;
-int makeRectLeft, makeRectTop;
-int mouseX, mouseY;
-int score=0;
-int check = 0;
+
 #define TIMER_ID_1      1
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -155,7 +159,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         //실제 게임창
         gameMenuRect.left = menuClientRect.left;
         gameMenuRect.top = menuClientRect.top+50;
-        gameMenuRect.right = menuClientRect.right - 100;
+        gameMenuRect.right = menuClientRect.right - 150;
         gameMenuRect.bottom = menuClientRect.bottom;
         SetTimer(hWnd, TIMER_ID_1, 0, NULL);
         //버튼 3종
@@ -179,6 +183,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 ShowWindow(gameHelpBtn, SW_HIDE);
                 ShowWindow(gameExitBtn, SW_HIDE);
                 gameStart = 2;
+                InvalidateRect(hWnd, NULL, TRUE);
                 break;
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
@@ -197,26 +202,35 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         mouseY = HIWORD(lParam);
         break;
     case WM_KEYDOWN:
+        //41 : A, 53 : S, 44: D
         switch (wParam)
         {
-        case VK_SPACE:
+          
+        case 0x53:
             check = gameTileRect->CheckTile(mouseX, mouseY, makeRectLeft, makeRectTop, (makeRectLeft + 40), (makeRectTop + 40));
             //정답
             if (check == 1) {
-                score++;
+                score+=2;
                 KillTimer(hWnd, TIMER_ID_1);
-                SetTimer(hWnd, TIMER_ID_1, 3000, NULL);
+                SetTimer(hWnd, TIMER_ID_1, 1500, NULL);
                 InvalidateRect(hWnd, NULL, TRUE);
-
-                check = 0;
+                comboCheck = TRUE;
             }
             //틀림
             else if (check == 2) {
                 KillTimer(hWnd, TIMER_ID_1);
-                SetTimer(hWnd, TIMER_ID_1, 3000, NULL);
+                SetTimer(hWnd, TIMER_ID_1, 1500, NULL);
                 InvalidateRect(hWnd, NULL, TRUE);
-
-                check = 0;
+                comboCheck = FALSE;
+            }
+            //애매
+            else if (check == 3) {
+                score++;
+                KillTimer(hWnd, TIMER_ID_1);
+                SetTimer(hWnd, TIMER_ID_1, 1500, NULL);
+                InvalidateRect(hWnd, NULL, TRUE);
+                comboCheck = TRUE;
+                
             }
             break;
         default:
@@ -224,10 +238,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         break;
     case WM_TIMER:
-        if (TIMER_ID_1 == wParam) {
+        if (TIMER_ID_1 == wParam && gameStart == 2) {
             //
             KillTimer(hWnd, TIMER_ID_1);                    // 1번을 정지
-            SetTimer(hWnd, TIMER_ID_1, 3000, NULL);
+            SetTimer(hWnd, TIMER_ID_1, 1500, NULL);
             InvalidateRect(hWnd, NULL, TRUE);
         }
         break;
@@ -235,6 +249,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
+            HDC MemDC;
+            HBITMAP myBitmap, oldBitmap;
+            
             if (gameStart == 2) {
 
                 Rectangle(hdc, gameMenuRect.left, gameMenuRect.top, gameMenuRect.right, gameMenuRect.bottom);
@@ -249,10 +266,31 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 if (makeRectTop < gameMenuRect.top) {
                     makeRectTop = gameMenuRect.top + 2;
                 }
-                Rectangle(hdc, makeRectLeft, makeRectTop, (makeRectLeft + 40), (makeRectTop + 40));
-                WCHAR gameScoreText[16];
+                MemDC = CreateCompatibleDC(hdc);
+                myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_TILE_S));  //초기화
+                oldBitmap = (HBITMAP)SelectObject(MemDC, myBitmap);
+                BitBlt(hdc, makeRectLeft, makeRectTop, 40, 40, MemDC, 0, 0, SRCCOPY);  //비트맵 그려주기
+                SelectObject(MemDC, oldBitmap);
+                DeleteObject(myBitmap);
+                //Rectangle(hdc, makeRectLeft, makeRectTop, (makeRectLeft + 40), (makeRectTop + 40));
+                
+                WCHAR gameScoreText[32];
                 wsprintfW(gameScoreText, L"점수 : %d", score);
-                TextOut(hdc, menuClientRect.right - 60, 30, gameScoreText, lstrlenW(gameScoreText));
+                TextOut(hdc, menuClientRect.right - 80, 30, gameScoreText, lstrlenW(gameScoreText));
+                //어느정도 정확도인지 써주기
+                if (check == 1) {
+                    wsprintfW(gameScoreText, L"Perfect Hit");
+                    TextOut(hdc, menuClientRect.right - 80, 45, gameScoreText, lstrlenW(gameScoreText));
+                }
+                else if (check == 2) {
+                    wsprintfW(gameScoreText, L"Miss");
+                    TextOut(hdc, menuClientRect.right - 80, 45, gameScoreText, lstrlenW(gameScoreText));
+                }
+                else if (check == 3) {
+                    wsprintfW(gameScoreText, L"Normal Hit");
+                    TextOut(hdc, menuClientRect.right - 80, 45, gameScoreText, lstrlenW(gameScoreText));
+                }
+                check = 0;
             }
 
 

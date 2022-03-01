@@ -12,14 +12,21 @@ int RectControl::CheckTile(int mouseX, int mouseY, int tileLeft, int tileTop, in
 	if (mouseX >= tileLeft && mouseX < tileRight) {
 		if (mouseY >= tileTop && mouseY < tileBottom) {
 			check = 1;
+			return check;
 		}
 	}
-	//오류 체크 2
-	if (mouseX <= (tileLeft - 2) || mouseX >= (tileRight + 2)) {
+	//오류 체크 2, 애매한 판정 3
+	if (mouseX <= (tileLeft - 3) || mouseX >= (tileRight + 3)) {
 		check = 2;
 	}
-	if (mouseY <= (tileTop -2) || mouseY >= (tileBottom+2)) {
+	else {
+		check = 3;
+	}
+	if (mouseY <= (tileTop -3) || mouseY >= (tileBottom+3)) {
 		check = 2;
+	}
+	else {
+		check = 3;
 	}
 	return check;
 }
