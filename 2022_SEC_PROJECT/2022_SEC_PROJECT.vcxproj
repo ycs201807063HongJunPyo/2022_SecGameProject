@@ -157,6 +157,8 @@
   <ItemGroup>
     <Image Include="2022_SEC_PROJECT.ico" />
     <Image Include="small.ico" />
+    <Image Include="TileImage\Tile_A.bmp" />
+    <Image Include="TileImage\Tile_D.bmp" />
     <Image Include="TileImage\Tile_S.bmp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

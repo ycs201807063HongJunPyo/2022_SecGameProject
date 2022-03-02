@@ -31,8 +31,14 @@ int makeRectLeft, makeRectTop;  //제작용 타일 좌표
 int mouseX, mouseY;  //마우스 위치
 int score = 0; //점수
 int check = 0;  //성공했나?
+int tileAlphabet = 0; //0:없음, 1:A, 2:S, 3:D
+int tileContinu = 0;
 //
 BOOL comboCheck = FALSE;  //콤보 체크용
+
+//함수
+void TimerInit(HWND timeHWND, int flag);  //타이머 초기화용 함수(flag 1 -> 맞음, 2 -> 틀림)
+void TileMake();  //타일 만들어주기
 
 // 이 코드 모듈에 포함된 함수의 선언을 전달합니다:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -146,7 +152,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //
 RectControl* gameTileRect = new RectControl;
 
-#define TIMER_ID_1      1
+#define TIMER_ID_1      1  //타일용
+#define TIMER_ID_2      2  //노래용
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     
@@ -183,6 +190,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 ShowWindow(gameHelpBtn, SW_HIDE);
                 ShowWindow(gameExitBtn, SW_HIDE);
                 gameStart = 2;
+                SetTimer(hWnd, TIMER_ID_2, 5000, NULL);
                 InvalidateRect(hWnd, NULL, TRUE);
                 break;
             case IDM_ABOUT:
@@ -203,34 +211,74 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     case WM_KEYDOWN:
         //41 : A, 53 : S, 44: D
+        check = gameTileRect->CheckTile(mouseX, mouseY, makeRectLeft, makeRectTop, (makeRectLeft + 40), (makeRectTop + 40));
         switch (wParam)
         {
-          
+        case 0x41:
+            if (tileAlphabet == 1) {
+                //정답
+                if (check == 1) {
+                    score += 2;
+                    TimerInit(hWnd, 1);
+                }
+                //틀림
+                else if (check == 2) {
+                    TimerInit(hWnd, 2);
+                }
+                //애매
+                else if (check == 3) {
+                    score++;
+                    TimerInit(hWnd, 1);
+
+                }
+            }
+            else {
+                TimerInit(hWnd, 2);
+            }
+            break;
         case 0x53:
-            check = gameTileRect->CheckTile(mouseX, mouseY, makeRectLeft, makeRectTop, (makeRectLeft + 40), (makeRectTop + 40));
-            //정답
-            if (check == 1) {
-                score+=2;
-                KillTimer(hWnd, TIMER_ID_1);
-                SetTimer(hWnd, TIMER_ID_1, 1500, NULL);
-                InvalidateRect(hWnd, NULL, TRUE);
-                comboCheck = TRUE;
+            if (tileAlphabet == 2) {
+                //정답
+                if (check == 1) {
+                    score += 2;
+                    TimerInit(hWnd, 1);
+                }
+                //틀림
+                else if (check == 2) {
+                    TimerInit(hWnd, 2);
+                }
+                //애매
+                else if (check == 3) {
+                    score++;
+                    TimerInit(hWnd, 1);
+
+                }
             }
-            //틀림
-            else if (check == 2) {
-                KillTimer(hWnd, TIMER_ID_1);
-                SetTimer(hWnd, TIMER_ID_1, 1500, NULL);
-                InvalidateRect(hWnd, NULL, TRUE);
-                comboCheck = FALSE;
+            else {
+                TimerInit(hWnd, 2);
             }
-            //애매
-            else if (check == 3) {
-                score++;
-                KillTimer(hWnd, TIMER_ID_1);
-                SetTimer(hWnd, TIMER_ID_1, 1500, NULL);
-                InvalidateRect(hWnd, NULL, TRUE);
-                comboCheck = TRUE;
-                
+            break;
+        case 0x44:
+            if (tileAlphabet == 3) {
+                //정답
+                if (check == 1) {
+                    score += 2;
+                    TimerInit(hWnd, 1);
+                }
+                //틀림
+                else if (check == 2) {
+                    TimerInit(hWnd, 2);
+                }
+                //애매
+                else if (check == 3) {
+                    score++;
+                    TimerInit(hWnd, 1);
+
+                }
+            }
+            else {
+                check = 2;
+                TimerInit(hWnd, 2);
             }
             break;
         default:
@@ -239,11 +287,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     case WM_TIMER:
         if (TIMER_ID_1 == wParam && gameStart == 2) {
-            //
             KillTimer(hWnd, TIMER_ID_1);                    // 1번을 정지
             SetTimer(hWnd, TIMER_ID_1, 1500, NULL);
             InvalidateRect(hWnd, NULL, TRUE);
         }
+        /*
+        else if (TIMER_ID_2 == wParam) {
+            score += 500;
+            KillTimer(hWnd, TIMER_ID_2);                    // 1번을 정지
+            SetTimer(hWnd, TIMER_ID_2, 5000, NULL);
+            InvalidateRect(hWnd, NULL, TRUE);
+        }
+        */
         break;
     case WM_PAINT:
         {
@@ -255,19 +310,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             if (gameStart == 2) {
 
                 Rectangle(hdc, gameMenuRect.left, gameMenuRect.top, gameMenuRect.right, gameMenuRect.bottom);
-                makeRectLeft = (rand() % gameMenuRect.right);
-                if (makeRectLeft >= (gameMenuRect.right - 40)) {
-                    makeRectLeft = gameMenuRect.right - 45;
-                }
-                makeRectTop = (rand() % gameMenuRect.bottom);
-                if ((makeRectTop+40) >= (gameMenuRect.bottom - 10)) {
-                    makeRectTop = gameMenuRect.bottom - 45;
-                }
-                if (makeRectTop < gameMenuRect.top) {
-                    makeRectTop = gameMenuRect.top + 2;
-                }
+                
                 MemDC = CreateCompatibleDC(hdc);
-                myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_TILE_S));  //초기화
+                TileMake();
+                //타일 색 바꿔주기
+                tileAlphabet = (rand() % 3) + 1;
+                myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_TILE_A));
+                if (tileAlphabet == 1) {
+                    myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_TILE_A));
+                }
+                else if (tileAlphabet == 2) {
+                    myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_TILE_S));
+                }
+                else if (tileAlphabet == 3) {
+                    myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_TILE_D));
+                }
                 oldBitmap = (HBITMAP)SelectObject(MemDC, myBitmap);
                 BitBlt(hdc, makeRectLeft, makeRectTop, 40, 40, MemDC, 0, 0, SRCCOPY);  //비트맵 그려주기
                 SelectObject(MemDC, oldBitmap);
@@ -292,7 +349,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 }
                 check = 0;
             }
-
+            
+            
 
             // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
             EndPaint(hWnd, &ps);
@@ -325,4 +383,60 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     }
     return (INT_PTR)FALSE;
+}
+
+void TimerInit(HWND timeHWND,int flag) {
+    if (flag == 1) {
+        KillTimer(timeHWND, TIMER_ID_1);
+        SetTimer(timeHWND, TIMER_ID_1, 1500, NULL);
+        InvalidateRect(timeHWND, NULL, TRUE);
+        comboCheck = TRUE;
+    }
+    else if (flag == 2) {
+        KillTimer(timeHWND, TIMER_ID_1);
+        SetTimer(timeHWND, TIMER_ID_1, 1500, NULL);
+        InvalidateRect(timeHWND, NULL, TRUE);
+        comboCheck = FALSE;
+    }
+}
+
+void TileMake() {
+    //기본 랜덤
+    makeRectLeft = (rand() % gameMenuRect.right);
+    makeRectTop = (rand() % gameMenuRect.bottom);
+    if (makeRectLeft >= (gameMenuRect.right - 40)) {
+        makeRectLeft = gameMenuRect.right - 45;
+    }
+
+    if ((makeRectTop + 40) >= (gameMenuRect.bottom - 10)) {
+        makeRectTop = gameMenuRect.bottom - 45;
+    }
+    if (makeRectTop < gameMenuRect.top) {
+        makeRectTop = gameMenuRect.top + 2;
+    }
+    /*
+    //내려가는거
+    if (tileContinu == 0) {
+        makeRectLeft = (rand() % gameMenuRect.right);
+        makeRectTop = (rand() % gameMenuRect.bottom);
+    }
+    else if (tileContinu < 5) {
+        makeRectTop += 45;
+    }
+    else if (tileContinu == 5) {
+        tileContinu = 0;
+    }
+    if (makeRectLeft >= (gameMenuRect.right - 40)) {
+        makeRectLeft = gameMenuRect.right - 45;
+    }
+
+    if ((makeRectTop + 40) >= (gameMenuRect.bottom - 10)) {
+        makeRectTop = gameMenuRect.bottom - 45;
+    }
+    if (makeRectTop < gameMenuRect.top) {
+        makeRectTop = gameMenuRect.top + 2;
+    }
+    tileContinu++;
+    */
+    
 }

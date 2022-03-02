@@ -54,5 +54,11 @@
     <Image Include="TileImage\Tile_S.bmp">
       <Filter>리소스 파일</Filter>
     </Image>
+    <Image Include="TileImage\Tile_A.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="TileImage\Tile_D.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
   </ItemGroup>
 </Project>
