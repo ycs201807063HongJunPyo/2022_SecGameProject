@@ -5,6 +5,10 @@
 #include "2022_SEC_PROJECT.h"
 #include "RectControl.h"
 
+//사운드 관련 테스트
+#include <mmsystem.h>
+#pragma comment(lib,"winmm.lib")
+
 #include<stdlib.h>
 #include<time.h>
 
@@ -14,6 +18,10 @@
 #define IDC_BTN_EDIT 5001  //설정 버튼 ID
 #define IDC_BTN_EXIT 5002  //종료 버튼 ID
 
+#define IDC_BTN_NEXT 5003  //다음 버튼 ID
+#define IDC_BTN_PRIV 5004  //이전 버튼 ID
+#define IDC_BTN_PLAY 5005  //이전 버튼 ID
+
 // 전역 변수:
 HINSTANCE hInst;                                // 현재 인스턴스입니다.
 WCHAR szTitle[MAX_LOADSTRING];                  // 제목 표시줄 텍스트입니다.
@@ -21,7 +29,7 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // 기본 창 클래스 이름�
 
 //내 변수들
 //UI
-HWND gameStartBtn, gameHelpBtn, gameExitBtn;
+HWND gameStartBtn, gameHelpBtn, gameExitBtn, gameNextBtn, gamePrivBtn, gamePlayBtn;
 RECT menuClientRect, gameMenuRect;  // 사용가능 영역 크기
 //게임시작용
 ///0 : 메인화면 / 1 : 노래 고르는 화면 / 2 : 게임 시작
@@ -179,6 +187,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             (menuClientRect.left + 50), 300, 150, 100, hWnd, (HMENU)IDC_BTN_EDIT, NULL, NULL);
         gameExitBtn = CreateWindow(L"button", L"종    료", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
             (menuClientRect.left + 50), 450, 150, 100, hWnd, (HMENU)IDC_BTN_EXIT, NULL, NULL);
+
+        gameNextBtn = CreateWindow(L"button", L"다음", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+            (menuClientRect.right - 250), (menuClientRect.bottom / 2), 100, 60, hWnd, (HMENU)IDC_BTN_NEXT, NULL, NULL);
+        gamePrivBtn = CreateWindow(L"button", L"이전", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+            (menuClientRect.left + 150), (menuClientRect.bottom / 2), 100, 60, hWnd, (HMENU)IDC_BTN_PRIV, NULL, NULL);
+        gamePlayBtn = CreateWindow(L"button", L"플레이", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+            (menuClientRect.left + 400), (menuClientRect.bottom / 2) + 100, 200, 60, hWnd, (HMENU)IDC_BTN_PLAY, NULL, NULL);
+        ShowWindow(gameNextBtn, SW_HIDE);
+        ShowWindow(gamePrivBtn, SW_HIDE);
+        ShowWindow(gamePlayBtn, SW_HIDE);
         break;
     case WM_COMMAND:
         {
@@ -187,11 +205,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             switch (wmId)
             {
             case IDC_BTN_START:
-                MessageBox(hWnd, L"드갑니다!", L"게임시작", MB_OK);
+                //곡 보여주기
+                ShowWindow(gameNextBtn, SW_SHOW);
+                ShowWindow(gamePrivBtn, SW_SHOW);
+                ShowWindow(gamePlayBtn, SW_SHOW);
                 //가려주기
                 ShowWindow(gameStartBtn, SW_HIDE);
                 ShowWindow(gameHelpBtn, SW_HIDE);
                 ShowWindow(gameExitBtn, SW_HIDE);
+                gameStart = 1;
+                InvalidateRect(hWnd, NULL, TRUE);
+                break;
+            case IDC_BTN_PLAY:
+                //가려주기
+                ShowWindow(gameNextBtn, SW_HIDE);
+                ShowWindow(gamePrivBtn, SW_HIDE);
+                ShowWindow(gamePlayBtn, SW_HIDE);
+                //노래 틀기(깃허브 올릴땐 빼고 올리기)
+                //PlaySound(L"musicBox\\Hit-the-Lights-Twin-Musicom.wav", 0, SND_FILENAME | SND_ASYNC);
                 tileContinuCount = 0;
                 gameStart = 2;
                 SetTimer(hWnd, TIMER_ID_2, 5000, NULL);
@@ -241,7 +272,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
                 }
             }
+
             else {
+                check = 2;
                 TimerInit(hWnd, defaultTime, 2);
             }
             break;
@@ -264,6 +297,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 }
             }
             else {
+                check = 2;
                 TimerInit(hWnd, defaultTime, 2);
             }
             break;
@@ -321,12 +355,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             HDC hdc = BeginPaint(hWnd, &ps);
             HDC MemDC;
             HBITMAP myBitmap, oldBitmap;
-            
-            if (gameStart == 2) {
+            MemDC = CreateCompatibleDC(hdc);
+            if (gameStart == 1) {
+                //악보 고를때 사진 보여주기
+                myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_MUSICIMAGE_01));
+                oldBitmap = (HBITMAP)SelectObject(MemDC, myBitmap);
+                BitBlt(hdc, (menuClientRect.left + 425), (menuClientRect.bottom / 2) - 100, 150, 150, MemDC, 0, 0, SRCCOPY);  //비트맵 그려주기
+                SelectObject(MemDC, oldBitmap);
+                DeleteObject(myBitmap);
+            }
+            else if (gameStart == 2) {
 
                 Rectangle(hdc, gameMenuRect.left, gameMenuRect.top, gameMenuRect.right, gameMenuRect.bottom);
                 if (doTileMake == TRUE) {
-                    MemDC = CreateCompatibleDC(hdc);
+                    //해당 노래 화면 보여주기(우측 하단)
+                    myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_MUSICIMAGE_01));
+                    oldBitmap = (HBITMAP)SelectObject(MemDC, myBitmap);
+                    BitBlt(hdc, menuClientRect.right-150, menuClientRect.bottom - 150, 150, 150, MemDC, 0, 0, SRCCOPY);  //비트맵 그려주기
+                    SelectObject(MemDC, oldBitmap);
+                    DeleteObject(myBitmap);
+
                     TileMake();
                     //타일 색 바꿔주기
                     tileAlphabet = (rand() % 3) + 1;

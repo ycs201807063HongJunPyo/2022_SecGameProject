@@ -156,6 +156,7 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="2022_SEC_PROJECT.ico" />
+    <Image Include="musicImage\musicImage_1.bmp" />
     <Image Include="small.ico" />
     <Image Include="TileImage\Tile_A.bmp" />
     <Image Include="TileImage\Tile_D.bmp" />
