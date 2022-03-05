@@ -4,6 +4,7 @@
 #include "framework.h"
 #include "2022_SEC_PROJECT.h"
 #include "RectControl.h"
+#include <mmsystem.h>
 
 //사운드 관련 테스트
 #include <mmsystem.h>
@@ -42,13 +43,16 @@ int check = 0;  //성공했나?
 int tileAlphabet = 0; //0:없음, 1:A, 2:S, 3:D
 int tileContinu = 0;  //타일이 어느형식으로 나오나?
 int tileContinuCount = 0;  //타일이 몇번째 나온건가?
+int defaultTime; //타일용 타이머 시간설정
 //
 BOOL comboCheck = FALSE;  //콤보 체크용
 BOOL doTileMake = FALSE;  //타일 만들어주나
-
+//
+HWND test_hWnd;
+UINT timer_id_thread;
 //함수
 void TimerInit(HWND timeHWND, int timeSet, int flag);  //타이머 초기화용 함수(flag 1 -> 맞음, 2 -> 틀림)
-void TileMake();  //타일 만들어주기
+void TileMake(HWND makeHWND);  //타일 만들어주기
 
 // 이 코드 모듈에 포함된 함수의 선언을 전달합니다:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -165,9 +169,20 @@ RectControl* gameTileRect = new RectControl;
 #define TIMER_ID_1      1  //타일용
 #define TIMER_ID_2      2  //노래용
 
+/*
+//멀티미디어타이머용
+void CALLBACK TimerProc(UINT m_nTimerID, UINT uMsg, DWORD dwUser, DWORD dw1, DWORD dw2)
+{
+    
+    doTileMake = TRUE;
+    TileMake(test_hWnd);
+    tileContinuCount++;
+    timer_id_thread = timeSetEvent(defaultTime, 10, TimerProc, TIMER_ID_1, TIME_ONESHOT);
+
+}
+*/
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    int defaultTime; //타일용 타이머 시간설정
     switch (message)
     {
     case WM_CREATE:
@@ -225,7 +240,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 //PlaySound(L"musicBox\\Hit-the-Lights-Twin-Musicom.wav", 0, SND_FILENAME | SND_ASYNC);
                 tileContinuCount = 0;
                 gameStart = 2;
-                SetTimer(hWnd, TIMER_ID_2, 5000, NULL);
+                //기본 시간 1000
+                defaultTime = 1000;
+                //timer_id_thread = timeSetEvent(defaultTime, 0, TimerProc, TIMER_ID_1, TIME_ONESHOT);
+                //SetTimer(hWnd, TIMER_ID_2, 5000, NULL);
                 InvalidateRect(hWnd, NULL, TRUE);
                 break;
             case IDM_ABOUT:
@@ -246,11 +264,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     case WM_KEYDOWN:
         //41 : A, 53 : S, 44: D
-        //기본 시간 1200, 연속 타일은 500
-        defaultTime = 1500;
-        if (tileContinu >= 2) {
-            defaultTime = 500;
-        }
+        
+        
         check = gameTileRect->CheckTile(mouseX, mouseY, makeRectLeft, makeRectTop, (makeRectLeft + 40), (makeRectTop + 40));
         switch (wParam)
         {
@@ -327,28 +342,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         default:
             break;
         }
+        InvalidateRect(hWnd, NULL, TRUE);
         doTileMake = TRUE;
         break;
     case WM_TIMER:
         if (TIMER_ID_1 == wParam && gameStart == 2) {
-            defaultTime = 1500;
-            if (tileContinu <= 2) {
-                defaultTime = 500;
-            }
             doTileMake = TRUE;
             KillTimer(hWnd, TIMER_ID_1);                    // 1번을 정지
             SetTimer(hWnd, TIMER_ID_1, defaultTime, NULL);
+            TileMake(test_hWnd);
+            tileContinuCount++;
             InvalidateRect(hWnd, NULL, TRUE);
+            UpdateWindow(hWnd);
         }
-        /*
-        else if (TIMER_ID_2 == wParam) {
-            score += 500;
-            KillTimer(hWnd, TIMER_ID_2);                    // 1번을 정지
-            SetTimer(hWnd, TIMER_ID_2, 5000, NULL);
-            InvalidateRect(hWnd, NULL, TRUE);
-        }
-        */
-        break;
     case WM_PAINT:
         {
             PAINTSTRUCT ps;
@@ -375,7 +381,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     SelectObject(MemDC, oldBitmap);
                     DeleteObject(myBitmap);
 
-                    TileMake();
+                    //TileMake();
                     //타일 색 바꿔주기
                     tileAlphabet = (rand() % 3) + 1;
                     myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_TILE_A));
@@ -415,6 +421,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 check = 0;
                 wsprintfW(gameScoreText, L"%d %d", gameMenuRect.right - gameMenuRect.left, gameMenuRect.bottom - gameMenuRect.top);
                 TextOut(hdc, menuClientRect.right - 80, 75, gameScoreText, lstrlenW(gameScoreText));
+
+                wsprintfW(gameScoreText, L"타이머 : %d", tileContinuCount);
+                TextOut(hdc, menuClientRect.right - 80, 60, gameScoreText, lstrlenW(gameScoreText));
             }
             // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
             EndPaint(hWnd, &ps);
@@ -450,22 +459,46 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 }
 
 void TimerInit(HWND timeHWND, int timeSet, int flag) {
+    //timeKillEvent(timer_id_thread);
+    //timer_id_thread = timeSetEvent(defaultTime, 0, TimerProc, TIMER_ID_1, TIME_ONESHOT);
     if (flag == 1) {
         KillTimer(timeHWND, TIMER_ID_1);
-        SetTimer(timeHWND, TIMER_ID_1, timeSet, NULL);
-        InvalidateRect(timeHWND, NULL, TRUE);
+        SetTimer(timeHWND, TIMER_ID_1, defaultTime, NULL);
         comboCheck = TRUE;
     }
     else if (flag == 2) {
         KillTimer(timeHWND, TIMER_ID_1);
-        SetTimer(timeHWND, TIMER_ID_1, timeSet, NULL);
-        InvalidateRect(timeHWND, NULL, TRUE);
+        SetTimer(timeHWND, TIMER_ID_1, defaultTime, NULL);
         comboCheck = FALSE;
     }
+    TileMake(test_hWnd);
+    tileContinuCount++;
+    
 }
 
-void TileMake() {
+void TileMake(HWND makeHWND) {
+    if (tileContinuCount == 0) {
+        makeRectLeft = 30;
+        makeRectTop = 100;
+    }
+    else if(tileContinuCount == 1) {
+        makeRectLeft = 45;
+        makeRectTop = 100;
+    }
+    else if (tileContinuCount == 2) {
+        makeRectLeft = 65;
+        makeRectTop = 125;
+    }
+    else if (tileContinuCount == 3) {
+        makeRectLeft = 85;
+        makeRectTop = 125;
+    }
+    else if (tileContinuCount == 4) {
+        makeRectLeft = 35;
+        makeRectTop = 65;
+    }
     
+    /*    
     //기본값
     if (tileContinu == 0) {
         //타일 좌표
@@ -550,4 +583,5 @@ void TileMake() {
         }
         tileContinu = 0;
     }
+    */
 }
