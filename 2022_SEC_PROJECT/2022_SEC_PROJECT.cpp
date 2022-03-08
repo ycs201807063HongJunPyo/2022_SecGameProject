@@ -23,6 +23,8 @@
 #define IDC_BTN_PRIV 5004  //이전 버튼 ID
 #define IDC_BTN_PLAY 5005  //이전 버튼 ID
 
+#define IDC_COMBO_SELECT 6001  //콤보 버튼 ID
+
 // 전역 변수:
 HINSTANCE hInst;                                // 현재 인스턴스입니다.
 WCHAR szTitle[MAX_LOADSTRING];                  // 제목 표시줄 텍스트입니다.
@@ -44,14 +46,16 @@ int tileAlphabet = 0; //0:없음, 1:A, 2:S, 3:D
 int tileContinu = 0;  //타일이 어느형식으로 나오나?
 int tileContinuCount = 0;  //타일이 몇번째 나온건가?
 int defaultTime; //타일용 타이머 시간설정
+int musicRank = -1; //-1 미설정, 0 보통, 1 어려움
+int gameScore = 0;  //게임 점수
+int maxGameScore = -1;  //최고 게임 점수
 //
-BOOL comboCheck = FALSE;  //콤보 체크용
 BOOL doTileMake = FALSE;  //타일 만들어주나
+BOOL checkFullCombo = FALSE;  // 풀콤보 체크용
 //
 HWND test_hWnd;
 UINT timer_id_thread;
 //함수
-void TimerInit(HWND timeHWND, int timeSet, int flag);  //타이머 초기화용 함수(flag 1 -> 맞음, 2 -> 틀림)
 void TileMake(HWND makeHWND);  //타일 만들어주기
 
 // 이 코드 모듈에 포함된 함수의 선언을 전달합니다:
@@ -181,37 +185,141 @@ void CALLBACK TimerProc(UINT m_nTimerID, UINT uMsg, DWORD dwUser, DWORD dw1, DWO
 
 }
 */
+
+BOOL CALLBACK GameStageDlgProc(HWND hDlg, UINT iMessage, WPARAM wParam, LPARAM lParam)
+{
+    HWND dlgHWND;
+    WCHAR text_score[128] = { 0, };
+    TCHAR Items[][10] = { L"Normal", L"Hard"};
+    switch (iMessage) {
+    case WM_INITDIALOG:
+        SetDlgItemInt(hDlg, 100, 100, FALSE);
+        SetDlgItemInt(hDlg, 150, 150, FALSE);
+
+        wsprintfW(text_score, L"Abbey Cadence (Sting) - Twin Musicom \nMax Score : %d", gameScore);
+        dlgHWND = GetDlgItem(hDlg, IDC_STATIC_GAMESCORE);
+        SetWindowText(dlgHWND, text_score);
+
+        wsprintfW(text_score, L"Noraml 난이도 : A, S, D 노트 타일이 등장하며\n풀콤보에 성공하면 2배 점수를 획득합니다.\n\nHard 난이도 : W, X 노트 타일이 추가로 등장하며\n풀콤보에 성공하면 3배 점수를 획득합니다.");
+        dlgHWND = GetDlgItem(hDlg, IDC_STATIC_GAMERANKHELP);
+        SetWindowText(dlgHWND, text_score);
+
+        dlgHWND = CreateWindow(TEXT("combobox"), NULL, WS_CHILD | WS_VISIBLE | WS_BORDER | CBS_DROPDOWNLIST, 10, 225, 200, 100, hDlg, (HMENU)IDC_COMBO_SELECT, hInst, NULL);
+        for (int i = 0; i <= 1; i++) {
+            SendMessage(dlgHWND, CB_ADDSTRING, 0, (LPARAM)Items[i]);
+        }
+        SendMessage(dlgHWND, CB_SETCURSEL, 0, 0);  //난이도 설정
+        musicRank = 0;
+        return TRUE;
+    case WM_COMMAND:
+
+        //창 닫기
+        if (LOWORD(wParam) == IDCANCEL || LOWORD(wParam) == IDCLOSE)
+        {
+            EndDialog(hDlg, LOWORD(wParam));
+        }
+        //게임 선택
+        else if(LOWORD(wParam) == IDC_BUTTON_GAMESETSTART){
+            dlgHWND = GetDlgItem(hDlg, IDC_COMBO_SELECT);
+            musicRank = SendMessage(dlgHWND, CB_GETCURSEL, 0, 0);  //난이도 설정
+            //노래 틀기(깃허브 올릴땐 빼고 올리기)
+            PlaySound(L"musicBox\\Abbey Cadence (Sting) - Twin Musicom.wav", 0, SND_FILENAME | SND_ASYNC);
+            tileContinuCount = 0;
+            gameStart = 2;
+            //기본 시간 1000
+            SetTimer(test_hWnd, TIMER_ID_1, 0, NULL);
+            InvalidateRect(test_hWnd, NULL, TRUE);
+            checkFullCombo = TRUE;
+            EndDialog(hDlg, LOWORD(wParam));
+        }
+        break;
+    }
+    return 0;
+}
+
+BOOL CALLBACK GameScoreDlgProc(HWND hDlg, UINT iMessage, WPARAM wParam, LPARAM lParam)
+{
+    HWND dlgHWND;
+    HWND imageHWND;
+    WCHAR text_score[32] = { 0, };
+    TCHAR Items[][10] = { L"Normal", L"Hard" };
+    switch (iMessage) {
+    case WM_INITDIALOG:
+
+        SetDlgItemInt(hDlg, 100, 100, FALSE);
+        SetDlgItemInt(hDlg, 150, 150, FALSE);
+        imageHWND = GetDlgItem(hDlg, IDC_STATIC_SCOREIMAGE);
+        ShowWindow(imageHWND, SW_HIDE);
+
+        gameScore = score;
+        if (checkFullCombo == TRUE && musicRank == 0) {
+            gameScore *= 2;
+        }
+        else if (checkFullCombo == TRUE && musicRank == 1) {
+            gameScore *= 3;
+        }
+        
+        //최고 점수인가?
+        if (maxGameScore < gameScore) {
+            ShowWindow(imageHWND, SW_SHOW);
+            maxGameScore = gameScore;
+        }
+        //IDC_STATIC_SCOREBOX_SCORE
+        wsprintfW(text_score, L"Score : %d", gameScore);
+        dlgHWND = GetDlgItem(hDlg, IDC_STATIC_SCOREBOX_SCORE);
+        SetWindowText(dlgHWND, text_score);
+        
+        return TRUE;
+    case WM_COMMAND:
+        //창 닫기
+        if (LOWORD(wParam) == IDCANCEL || LOWORD(wParam) == IDCLOSE)
+        {
+            gameStart = 0;
+            score = 0;
+            ShowWindow(gameStartBtn, SW_SHOW);
+            ShowWindow(gameHelpBtn, SW_SHOW);
+            ShowWindow(gameExitBtn, SW_SHOW);
+            InvalidateRect(test_hWnd, NULL, TRUE);
+            EndDialog(hDlg, LOWORD(wParam));
+        }
+        break;
+    }
+    return 0;
+}
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    test_hWnd = hWnd;
     switch (message)
     {
     case WM_CREATE:
         srand((unsigned int)time(NULL));
-        SetWindowPos(hWnd, NULL, 500, 300, 1024, 768, 0);  // 게임창 크기 조절
+        SetWindowPos(hWnd, NULL, 500, 300, 920, 520, 0);  // 게임창 크기 조절
         GetClientRect(hWnd, &menuClientRect);  // 조절된 크기 가져오기
         //실제 게임창
         gameMenuRect.left = menuClientRect.left;
         gameMenuRect.top = menuClientRect.top+50;
         gameMenuRect.right = menuClientRect.right - 150;
         gameMenuRect.bottom = menuClientRect.bottom;
-        SetTimer(hWnd, TIMER_ID_1, 0, NULL);
+        gameStart = 0;
         //버튼 3종
         gameStartBtn = CreateWindow(L"button", L"게 임  시 작", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            (menuClientRect.left + 50), 150, 150, 100, hWnd, (HMENU)IDC_BTN_START, NULL, NULL);
+            (menuClientRect.left + 30), 50, 125, 75, hWnd, (HMENU)IDC_BTN_START, NULL, NULL);
         gameHelpBtn = CreateWindow(L"button", L"설    정", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            (menuClientRect.left + 50), 300, 150, 100, hWnd, (HMENU)IDC_BTN_EDIT, NULL, NULL);
+            (menuClientRect.left + 30), 175, 125, 75, hWnd, (HMENU)IDC_BTN_EDIT, NULL, NULL);
         gameExitBtn = CreateWindow(L"button", L"종    료", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            (menuClientRect.left + 50), 450, 150, 100, hWnd, (HMENU)IDC_BTN_EXIT, NULL, NULL);
+            (menuClientRect.left + 30), 300, 125, 75, hWnd, (HMENU)IDC_BTN_EXIT, NULL, NULL);
 
         gameNextBtn = CreateWindow(L"button", L"다음", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            (menuClientRect.right - 250), (menuClientRect.bottom / 2), 100, 60, hWnd, (HMENU)IDC_BTN_NEXT, NULL, NULL);
+            (menuClientRect.right - 350), (menuClientRect.bottom / 2), 100, 60, hWnd, (HMENU)IDC_BTN_NEXT, NULL, NULL);
         gamePrivBtn = CreateWindow(L"button", L"이전", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            (menuClientRect.left + 150), (menuClientRect.bottom / 2), 100, 60, hWnd, (HMENU)IDC_BTN_PRIV, NULL, NULL);
+            (menuClientRect.right - 750), (menuClientRect.bottom / 2), 100, 60, hWnd, (HMENU)IDC_BTN_PRIV, NULL, NULL);
         gamePlayBtn = CreateWindow(L"button", L"플레이", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            (menuClientRect.left + 400), (menuClientRect.bottom / 2) + 100, 200, 60, hWnd, (HMENU)IDC_BTN_PLAY, NULL, NULL);
+            (menuClientRect.left + 300), (menuClientRect.bottom / 2) + 100, 200, 60, hWnd, (HMENU)IDC_BTN_PLAY, NULL, NULL);
         ShowWindow(gameNextBtn, SW_HIDE);
         ShowWindow(gamePrivBtn, SW_HIDE);
         ShowWindow(gamePlayBtn, SW_HIDE);
+        InvalidateRect(hWnd, NULL, TRUE);
         break;
     case WM_COMMAND:
         {
@@ -232,19 +340,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 InvalidateRect(hWnd, NULL, TRUE);
                 break;
             case IDC_BTN_PLAY:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_GAMESETBOX), hWnd, GameStageDlgProc);
                 //가려주기
                 ShowWindow(gameNextBtn, SW_HIDE);
                 ShowWindow(gamePrivBtn, SW_HIDE);
                 ShowWindow(gamePlayBtn, SW_HIDE);
-                //노래 틀기(깃허브 올릴땐 빼고 올리기)
-                //PlaySound(L"musicBox\\Hit-the-Lights-Twin-Musicom.wav", 0, SND_FILENAME | SND_ASYNC);
-                tileContinuCount = 0;
-                gameStart = 2;
-                //기본 시간 1000
-                defaultTime = 1000;
-                //timer_id_thread = timeSetEvent(defaultTime, 0, TimerProc, TIMER_ID_1, TIME_ONESHOT);
-                //SetTimer(hWnd, TIMER_ID_2, 5000, NULL);
-                InvalidateRect(hWnd, NULL, TRUE);
+                
                 break;
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
@@ -264,8 +365,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     case WM_KEYDOWN:
         //41 : A, 53 : S, 44: D
-        
-        
+        //57 : W, 58 : X
         check = gameTileRect->CheckTile(mouseX, mouseY, makeRectLeft, makeRectTop, (makeRectLeft + 40), (makeRectTop + 40));
         switch (wParam)
         {
@@ -274,23 +374,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 //정답
                 if (check == 1) {
                     score += 2;
-                    TimerInit(hWnd, defaultTime, 1);
-                }
-                //틀림
-                else if (check == 2) {
-                    TimerInit(hWnd, defaultTime, 2);
                 }
                 //애매
                 else if (check == 3) {
                     score++;
-                    TimerInit(hWnd, defaultTime, 1);
-
                 }
             }
-
             else {
                 check = 2;
-                TimerInit(hWnd, defaultTime, 2);
             }
             break;
         case 0x53:
@@ -298,22 +389,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 //정답
                 if (check == 1) {
                     score += 2;
-                    TimerInit(hWnd, defaultTime, 1);
-                }
-                //틀림
-                else if (check == 2) {
-                    TimerInit(hWnd, defaultTime, 2);
+
                 }
                 //애매
                 else if (check == 3) {
                     score++;
-                    TimerInit(hWnd, defaultTime, 1);
-
                 }
             }
             else {
                 check = 2;
-                TimerInit(hWnd, defaultTime, 2);
             }
             break;
         case 0x44:
@@ -321,37 +405,63 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 //정답
                 if (check == 1) {
                     score += 2;
-                    TimerInit(hWnd, defaultTime, 1);
-                }
-                //틀림
-                else if (check == 2) {
-                    TimerInit(hWnd, defaultTime, 2);
                 }
                 //애매
                 else if (check == 3) {
                     score++;
-                    TimerInit(hWnd, defaultTime, 1);
-
                 }
             }
             else {
                 check = 2;
-                TimerInit(hWnd, defaultTime, 2);
+            }
+            break;
+        case 0x57:
+            if (tileAlphabet == 4) {
+                //정답
+                if (check == 1) {
+                    score += 2;
+                }
+                //애매
+                else if (check == 3) {
+                    score++;
+                }
+            }
+            else {
+                check = 2;
+            }
+            break;
+        case 0x58:
+            if (tileAlphabet == 5) {
+                //정답
+                if (check == 1) {
+                    score += 2;
+                }
+                //애매
+                else if (check == 3) {
+                    score++;
+                }
+            }
+            else {
+                check = 2;
             }
             break;
         default:
             break;
         }
+        if (check == 2) {
+            checkFullCombo = FALSE;
+        }
         InvalidateRect(hWnd, NULL, TRUE);
-        doTileMake = TRUE;
+        doTileMake = FALSE;
         break;
     case WM_TIMER:
         if (TIMER_ID_1 == wParam && gameStart == 2) {
             doTileMake = TRUE;
-            KillTimer(hWnd, TIMER_ID_1);                    // 1번을 정지
-            SetTimer(hWnd, TIMER_ID_1, defaultTime, NULL);
             TileMake(test_hWnd);
             tileContinuCount++;
+            KillTimer(hWnd, TIMER_ID_1);                    // 1번을 정지
+            SetTimer(hWnd, TIMER_ID_1, defaultTime, NULL);
+            
             InvalidateRect(hWnd, NULL, TRUE);
             UpdateWindow(hWnd);
         }
@@ -362,46 +472,64 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             HDC MemDC;
             HBITMAP myBitmap, oldBitmap;
             MemDC = CreateCompatibleDC(hdc);
+            if (gameStart == 0) {
+                //메인화면 보여주기
+                myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_MUSICIMAGE_00));
+                oldBitmap = (HBITMAP)SelectObject(MemDC, myBitmap);
+                BitBlt(hdc, (menuClientRect.left + 350), 50, 500, 300, MemDC, 0, 0, SRCCOPY);  //비트맵 그려주기
+                SelectObject(MemDC, oldBitmap);
+                DeleteObject(myBitmap);
+            }
             if (gameStart == 1) {
                 //악보 고를때 사진 보여주기
                 myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_MUSICIMAGE_01));
                 oldBitmap = (HBITMAP)SelectObject(MemDC, myBitmap);
-                BitBlt(hdc, (menuClientRect.left + 425), (menuClientRect.bottom / 2) - 100, 150, 150, MemDC, 0, 0, SRCCOPY);  //비트맵 그려주기
+                BitBlt(hdc, (menuClientRect.left + 325), (menuClientRect.bottom / 2) - 100, 150, 150, MemDC, 0, 0, SRCCOPY);  //비트맵 그려주기
                 SelectObject(MemDC, oldBitmap);
                 DeleteObject(myBitmap);
             }
             else if (gameStart == 2) {
 
                 Rectangle(hdc, gameMenuRect.left, gameMenuRect.top, gameMenuRect.right, gameMenuRect.bottom);
-                if (doTileMake == TRUE) {
-                    //해당 노래 화면 보여주기(우측 하단)
-                    myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_MUSICIMAGE_01));
-                    oldBitmap = (HBITMAP)SelectObject(MemDC, myBitmap);
-                    BitBlt(hdc, menuClientRect.right-150, menuClientRect.bottom - 150, 150, 150, MemDC, 0, 0, SRCCOPY);  //비트맵 그려주기
-                    SelectObject(MemDC, oldBitmap);
-                    DeleteObject(myBitmap);
 
+
+                //해당 노래 화면 보여주기(우측 하단)
+                myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_MUSICIMAGE_01));
+                oldBitmap = (HBITMAP)SelectObject(MemDC, myBitmap);
+                BitBlt(hdc, menuClientRect.right - 150, menuClientRect.bottom - 150, 150, 150, MemDC, 0, 0, SRCCOPY);  //비트맵 그려주기
+                SelectObject(MemDC, oldBitmap);
+                DeleteObject(myBitmap);
+                if (tileContinuCount >= 2) {
                     //TileMake();
                     //타일 색 바꿔주기
-                    tileAlphabet = (rand() % 3) + 1;
-                    myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_TILE_A));
-                    if (tileAlphabet == 1) {
+                    if (doTileMake == TRUE) {
+
                         myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_TILE_A));
+                        if (tileAlphabet == 1) {
+                            myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_TILE_A));
+                        }
+                        else if (tileAlphabet == 2) {
+                            myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_TILE_S));
+                        }
+                        else if (tileAlphabet == 3) {
+                            myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_TILE_D));
+                        }
+                        else if (tileAlphabet == 4) {
+                            myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_TILE_W));
+                        }
+                        else if (tileAlphabet == 5) {
+                            myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_TILE_X));
+                        }
+                        oldBitmap = (HBITMAP)SelectObject(MemDC, myBitmap);
+                        BitBlt(hdc, makeRectLeft, makeRectTop, 40, 40, MemDC, 0, 0, SRCCOPY);  //비트맵 그려주기
+                        SelectObject(MemDC, oldBitmap);
+                        DeleteObject(myBitmap);
+
                     }
-                    else if (tileAlphabet == 2) {
-                        myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_TILE_S));
-                    }
-                    else if (tileAlphabet == 3) {
-                        myBitmap = LoadBitmap(hInst, MAKEINTATOM(IDB_BITMAP_TILE_D));
-                    }
-                    oldBitmap = (HBITMAP)SelectObject(MemDC, myBitmap);
-                    BitBlt(hdc, makeRectLeft, makeRectTop, 40, 40, MemDC, 0, 0, SRCCOPY);  //비트맵 그려주기
-                    SelectObject(MemDC, oldBitmap);
-                    DeleteObject(myBitmap);
-                    doTileMake = FALSE;
                 }
+
                 //Rectangle(hdc, makeRectLeft, makeRectTop, (makeRectLeft + 40), (makeRectTop + 40));
-                
+
                 WCHAR gameScoreText[32];
                 wsprintfW(gameScoreText, L"점수 : %d", score);
                 TextOut(hdc, menuClientRect.right - 80, 30, gameScoreText, lstrlenW(gameScoreText));
@@ -419,11 +547,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     TextOut(hdc, menuClientRect.right - 80, 45, gameScoreText, lstrlenW(gameScoreText));
                 }
                 check = 0;
-                wsprintfW(gameScoreText, L"%d %d", gameMenuRect.right - gameMenuRect.left, gameMenuRect.bottom - gameMenuRect.top);
-                TextOut(hdc, menuClientRect.right - 80, 75, gameScoreText, lstrlenW(gameScoreText));
-
-                wsprintfW(gameScoreText, L"타이머 : %d", tileContinuCount);
-                TextOut(hdc, menuClientRect.right - 80, 60, gameScoreText, lstrlenW(gameScoreText));
             }
             // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
             EndPaint(hWnd, &ps);
@@ -458,130 +581,54 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
     return (INT_PTR)FALSE;
 }
 
-void TimerInit(HWND timeHWND, int timeSet, int flag) {
-    //timeKillEvent(timer_id_thread);
-    //timer_id_thread = timeSetEvent(defaultTime, 0, TimerProc, TIMER_ID_1, TIME_ONESHOT);
-    if (flag == 1) {
-        KillTimer(timeHWND, TIMER_ID_1);
-        SetTimer(timeHWND, TIMER_ID_1, defaultTime, NULL);
-        comboCheck = TRUE;
-    }
-    else if (flag == 2) {
-        KillTimer(timeHWND, TIMER_ID_1);
-        SetTimer(timeHWND, TIMER_ID_1, defaultTime, NULL);
-        comboCheck = FALSE;
-    }
-    TileMake(test_hWnd);
-    tileContinuCount++;
-    
-}
-
 void TileMake(HWND makeHWND) {
+    //타일 어떤걸로 할지
+    //노말
+    if (musicRank == 0) {
+        tileAlphabet = (rand() % 3) + 1;
+    }
+    //하드
+    else if (musicRank == 1) {
+        tileAlphabet = (rand() % 5) + 1;
+    }
+    //타일 위치
     if (tileContinuCount == 0) {
+        defaultTime = 1600;
+    }
+    else if (tileContinuCount == 1) {
+        makeRectLeft = 60;
+        makeRectTop = 200;
+        defaultTime = 1000;
+    }
+    else if(tileContinuCount == 2) {
         makeRectLeft = 30;
-        makeRectTop = 100;
-    }
-    else if(tileContinuCount == 1) {
-        makeRectLeft = 45;
-        makeRectTop = 100;
-    }
-    else if (tileContinuCount == 2) {
-        makeRectLeft = 65;
-        makeRectTop = 125;
+        makeRectTop = 300;
+        defaultTime = 1200;
     }
     else if (tileContinuCount == 3) {
-        makeRectLeft = 85;
-        makeRectTop = 125;
+        makeRectLeft = 300;
+        makeRectTop = 250;
+        defaultTime = 900;
     }
     else if (tileContinuCount == 4) {
-        makeRectLeft = 35;
-        makeRectTop = 65;
+        makeRectLeft = 320;
+        makeRectTop = 280;
+        defaultTime = 300;
     }
-    
-    /*    
-    //기본값
-    if (tileContinu == 0) {
-        //타일 좌표
-        makeRectLeft = (rand() % gameMenuRect.right);
-        makeRectTop = (rand() % gameMenuRect.bottom);
-        tileContinu = (rand() % 5) + 1;
-        //아래로 내리는거면 조금 올려주기(보정)
-        if (tileContinu == 2) {
-            makeRectTop -= 40;
-        }
-        //왼쪽으로 보정
-        else if (tileContinu == 3) {
-            makeRectLeft -= 40;
-        }
-    }
-    //내려가는거
-    if (tileContinu == 1) {
-        if (tileContinuCount < 3) {
-            if ((makeRectTop + 40) >= (gameMenuRect.bottom - 10)) {
-                makeRectLeft -= 10;
-            }
-            else {
-                makeRectTop += 10;
-            }
-            
-        }
-        else if (tileContinuCount == 3) {
-            tileContinuCount = 0;
-            tileContinu = 0;
-            
-        }
-        if (makeRectLeft >= (gameMenuRect.right - 40)) {
-            makeRectLeft = gameMenuRect.right - 45;
-        }
 
-        if ((makeRectTop + 40) >= (gameMenuRect.bottom - 10)) {
-            makeRectTop = gameMenuRect.bottom - 45;
-        }
-        if (makeRectTop < gameMenuRect.top) {
-            makeRectTop = gameMenuRect.top + 2;
-        }
-        tileContinuCount++;
+    else if (tileContinuCount == 5) {
+        makeRectLeft = 255;
+        makeRectTop = 255;
+        defaultTime = 800;
     }
-    //오른쪽
-    else if (tileContinu == 2) {
-        if (tileContinuCount < 4) {
-            if (makeRectLeft >= (gameMenuRect.right - 40)) {
-                makeRectTop -= 10;
-            }
-            else {
-                makeRectLeft += 10;
-            }
-        }
-        else if (tileContinuCount == 4) {
-            tileContinuCount = 0;
-            tileContinu = 0;
-
-        }
-        if (makeRectLeft >= (gameMenuRect.right - 40)) {
-            makeRectLeft = gameMenuRect.right - 45;
-        }
-
-        if ((makeRectTop + 40) >= (gameMenuRect.bottom - 10)) {
-            makeRectTop = gameMenuRect.bottom - 45;
-        }
-        if (makeRectTop < gameMenuRect.top) {
-            makeRectTop = gameMenuRect.top + 2;
-        }
-        tileContinuCount++;
+    else if (tileContinuCount == 6) {
+        makeRectLeft = 255;
+        makeRectTop = 400;
+        defaultTime = 4000;
     }
-    //1개 배치
+
+    //게임 끝
     else {
-        if (makeRectLeft >= (gameMenuRect.right - 40)) {
-            makeRectLeft = gameMenuRect.right - 45;
-        }
-
-        if ((makeRectTop + 40) >= (gameMenuRect.bottom - 10)) {
-            makeRectTop = gameMenuRect.bottom - 45;
-        }
-        if (makeRectTop < gameMenuRect.top) {
-            makeRectTop = gameMenuRect.top + 2;
-        }
-        tileContinu = 0;
+        DialogBox(hInst, MAKEINTRESOURCE(IDD_SCOREBOX), makeHWND, GameScoreDlgProc);
     }
-    */
 }

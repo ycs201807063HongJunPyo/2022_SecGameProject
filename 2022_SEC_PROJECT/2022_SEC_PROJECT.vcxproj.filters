@@ -63,5 +63,17 @@
     <Image Include="musicImage\musicImage_1.bmp">
       <Filter>리소스 파일</Filter>
     </Image>
+    <Image Include="musicImage\musicImage_0.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="TileImage\Tile_W.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="TileImage\Tile_X.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="musicImage\newScoreImage.bmp">
+      <Filter>리소스 파일</Filter>
+    </Image>
   </ItemGroup>
 </Project>

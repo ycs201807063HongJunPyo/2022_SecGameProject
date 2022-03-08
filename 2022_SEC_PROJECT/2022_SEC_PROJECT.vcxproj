@@ -156,11 +156,15 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="2022_SEC_PROJECT.ico" />
+    <Image Include="musicImage\musicImage_0.bmp" />
     <Image Include="musicImage\musicImage_1.bmp" />
+    <Image Include="musicImage\newScoreImage.bmp" />
     <Image Include="small.ico" />
     <Image Include="TileImage\Tile_A.bmp" />
     <Image Include="TileImage\Tile_D.bmp" />
     <Image Include="TileImage\Tile_S.bmp" />
+    <Image Include="TileImage\Tile_W.bmp" />
+    <Image Include="TileImage\Tile_X.bmp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
